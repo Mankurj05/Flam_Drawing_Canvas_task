@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-primary: #aa3bff;
+  --color-brand-primary-light: rgba(170, 59, 255, 0.1);
+  --color-bg-light: #ffffff;
+  --color-bg-dark: #0f1015;
+  --color-card-light: #ffffff;
+  --color-card-dark: #16171d;
+  --color-border-light: #e5e4e7;
+  --color-border-dark: #2e303a;
+  --color-text-light: #6b6375;
+  --color-text-dark: #9ca3af;
+  --color-heading-light: #08060d;
+  --color-heading-dark: #f3f4f6;
+  
+  --shadow-premium: 0 8px 30px rgba(0, 0, 0, 0.08);
+  --shadow-premium-dark: 0 8px 30px rgba(0, 0, 0, 0.3);
+}
+
+:root {
+  --bg: #ffffff;
+  --text: #6b6375;
+  --text-h: #08060d;
+  --border: #e5e4e7;
+  --accent: #aa3bff;
+  --accent-bg: rgba(170, 59, 255, 0.05);
+  --accent-border: rgba(170, 59, 255, 0.3);
+  --shadow: var(--shadow-premium);
+}
+
+:root.dark {
+  --bg: #0f1015;
+  --text: #9ca3af;
+  --text-h: #f3f4f6;
+  --border: #22242b;
+  --accent: #c084fc;
+  --accent-bg: rgba(192, 132, 252, 0.08);
+  --accent-border: rgba(192, 132, 252, 0.3);
+  --shadow: var(--shadow-premium-dark);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  overflow-x: hidden;
+}
+
+/* Glassmorphism utility */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.dark .glass {
+  background: rgba(22, 23, 29, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Grid background for the canvas */
+.canvas-grid {
+  background-size: 30px 30px;
+  background-image: 
+    linear-gradient(to right, var(--border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+  background-position: center;
+}
