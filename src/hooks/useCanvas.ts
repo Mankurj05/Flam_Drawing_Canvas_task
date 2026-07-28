@@ -1,10 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CanvasEngine } from '@/components/canvas/CanvasEngine'
 import { useCanvasStore } from '@/store/canvasStore'
 import { useUIStore } from '@/store/uiStore'
 
 export const useCanvas = () => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null)
   const engineRef = useRef<CanvasEngine | null>(null)
 
   const objects = useCanvasStore((state) => state.objects)
@@ -15,7 +15,6 @@ export const useCanvas = () => {
 
   // Initialize Canvas Engine & Rendering Loop
   useEffect(() => {
-    const canvas = canvasRef.current
     if (!canvas) return
 
     // Setup Canvas dimension resize logic matching device pixel ratio
@@ -68,7 +67,7 @@ export const useCanvas = () => {
       engine.stopRenderLoop()
       engineRef.current = null
     }
-  }, [])
+  }, [canvas])
 
   // Sync theme changes inside the engine
   useEffect(() => {
@@ -118,7 +117,7 @@ export const useCanvas = () => {
   }
 
   return {
-    canvasRef,
+    canvasRef: setCanvas,
     handleWheel,
   }
 }
