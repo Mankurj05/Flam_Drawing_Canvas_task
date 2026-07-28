@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Plus, ArrowRight, ArrowLeft, Trash2, Copy, ArrowUp, ArrowDown } from 'lucide-react'
+import { Plus, ArrowRight, ArrowLeft, Trash2, Copy, ArrowUp, ArrowDown, Undo, Redo } from 'lucide-react'
 import { nanoid } from 'nanoid'
 import { useCanvas } from '@/hooks/useCanvas'
 import { useDrawing } from '@/hooks/useDrawing'
 import { useSelection } from '@/hooks/useSelection'
+import { useHistory } from '@/hooks/useHistory'
 import { useCanvasStore } from '@/store/canvasStore'
 import { useToolStore } from '@/store/toolStore'
 import { Toolbar } from '@/components/toolbar/Toolbar'
@@ -17,6 +18,7 @@ export const RoomPage: React.FC = () => {
   const { canvasRef, handleWheel } = useCanvas()
   const { handleMouseDown: drawMouseDown, handleMouseMove: drawMouseMove, handleMouseUp: drawMouseUp, handleDoubleClick } = useDrawing()
   const { handleMouseDown: selectMouseDown, handleMouseMove: selectMouseMove, handleMouseUp: selectMouseUp, deleteSelected, duplicateSelected, bringForward, sendBackward } = useSelection()
+  const { undo, redo, canUndo, canRedo } = useHistory()
   const selectedIds = useCanvasStore((state) => state.selectedIds)
   const currentTool = useToolStore((state) => state.currentTool)
 
@@ -59,12 +61,22 @@ export const RoomPage: React.FC = () => {
       } else if (e.ctrlKey && e.key === 'ArrowDown') {
         e.preventDefault()
         sendBackward()
+      } else if (e.ctrlKey && e.key === 'z') {
+        e.preventDefault()
+        if (e.shiftKey) {
+          redo()
+        } else {
+          undo()
+        }
+      } else if (e.ctrlKey && e.key === 'y') {
+        e.preventDefault()
+        redo()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [deleteSelected, duplicateSelected, bringForward, sendBackward])
+  }, [deleteSelected, duplicateSelected, bringForward, sendBackward, undo, redo])
 
   const handleCreateRoom = (e: React.FormEvent) => {
     e.preventDefault()
@@ -152,6 +164,26 @@ export const RoomPage: React.FC = () => {
             </button>
           </div>
         )}
+
+        {/* History Actions */}
+        <div className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-2 flex items-center gap-2 z-50">
+          <button
+            onClick={undo}
+            disabled={!canUndo}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Undo (Ctrl+Z)"
+          >
+            <Undo size={20} className="text-gray-600 dark:text-gray-300" />
+          </button>
+          <button
+            onClick={redo}
+            disabled={!canRedo}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Redo (Ctrl+Y or Ctrl+Shift+Z)"
+          >
+            <Redo size={20} className="text-gray-600 dark:text-gray-300" />
+          </button>
+        </div>
       </div>
     )
   }
