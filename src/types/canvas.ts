@@ -7,6 +7,19 @@ export type ObjectType =
   | 'line' 
   | 'text'
 
+export type ToolType = 
+  | 'selection'
+  | 'pencil'
+  | 'rectangle'
+  | 'circle'
+  | 'ellipse'
+  | 'arrow'
+  | 'line'
+  | 'text'
+  | 'eraser'
+  | 'pan'
+  | 'zoom'
+
 export interface Point {
   x: number
   y: number

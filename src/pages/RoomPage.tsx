@@ -3,12 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Plus, ArrowRight, ArrowLeft } from 'lucide-react'
 import { nanoid } from 'nanoid'
 import { useCanvas } from '@/hooks/useCanvas'
+import { useDrawing } from '@/hooks/useDrawing'
+import { Toolbar } from '@/components/toolbar/Toolbar'
+import { PropertyPanel } from '@/components/toolbar/PropertyPanel'
 
 export const RoomPage: React.FC = () => {
   const { roomId } = useParams<{ roomId?: string }>()
   const navigate = useNavigate()
   const [roomInput, setRoomInput] = useState('')
   const { canvasRef, handleWheel } = useCanvas()
+  const { handleMouseDown, handleMouseMove, handleMouseUp, handleDoubleClick } = useDrawing()
 
   const handleCreateRoom = (e: React.FormEvent) => {
     e.preventDefault()
@@ -50,8 +54,17 @@ export const RoomPage: React.FC = () => {
         <canvas
           ref={canvasRef}
           onWheel={handleWheel}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onDoubleClick={handleDoubleClick}
           className="w-full h-full block bg-[#0f1015] cursor-default"
         />
+
+        {/* Drawing Tools */}
+        <Toolbar />
+        <PropertyPanel />
       </div>
     )
   }
