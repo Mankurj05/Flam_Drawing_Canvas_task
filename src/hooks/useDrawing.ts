@@ -132,7 +132,7 @@ export const useDrawing = () => {
     setStartPoint(null)
   }, [isDrawing, currentObject, updateObject])
 
-  const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleDoubleClick = useCallback(() => {
     // Keep this for future if we want to double click to edit existing text
   }, [])
 

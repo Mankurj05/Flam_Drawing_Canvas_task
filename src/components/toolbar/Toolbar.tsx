@@ -1,5 +1,5 @@
 import React, { useRef } from 'react'
-import { Pencil, Square, Circle, Minus, Type, Eraser, Hand, ZoomIn, MousePointer2, Download, Upload, Image as ImageIcon } from 'lucide-react'
+import { Pencil, Square, Circle, Minus, Type, Eraser, Hand, MousePointer2, Download, Upload, Image as ImageIcon } from 'lucide-react'
 import { useToolStore } from '@/store/toolStore'
 import { useCanvasStore } from '@/store/canvasStore'
 import { exportToJson, importFromJson, exportToImage } from '@/utils/exportImport'
