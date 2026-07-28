@@ -123,6 +123,11 @@ export class CanvasEngine {
 
   private drawObject(ctx: CanvasRenderingContext2D, obj: CanvasObject): void {
     ctx.save()
+    if (obj.metadata?.isEraser) {
+      ctx.globalCompositeOperation = 'destination-out'
+    } else {
+      ctx.globalCompositeOperation = 'source-over'
+    }
     ctx.globalAlpha = obj.opacity
     ctx.strokeStyle = obj.strokeColor
     ctx.fillStyle = obj.fillColor

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Plus, ArrowRight, ArrowLeft, Trash2, Copy, ArrowUp, ArrowDown, Undo, Redo } from 'lucide-react'
+import { Plus, ArrowRight, ArrowLeft, Trash2, Copy, ArrowUp, ArrowDown, Undo, Redo, ZoomIn, ZoomOut } from 'lucide-react'
 import { nanoid } from 'nanoid'
 import { useCanvas } from '@/hooks/useCanvas'
 import { useDrawing } from '@/hooks/useDrawing'
@@ -11,21 +11,36 @@ import { useCanvasStore } from '@/store/canvasStore'
 import { useToolStore } from '@/store/toolStore'
 import { Toolbar } from '@/components/toolbar/Toolbar'
 import { PropertyPanel } from '@/components/toolbar/PropertyPanel'
+import { throttle } from '@/utils/throttle'
+import { motion } from 'framer-motion'
 
 export const RoomPage: React.FC = () => {
   const { roomId } = useParams<{ roomId?: string }>()
   const navigate = useNavigate()
   const [roomInput, setRoomInput] = useState('')
   const { canvasRef, handleWheel } = useCanvas()
-  const { handleMouseDown: drawMouseDown, handleMouseMove: drawMouseMove, handleMouseUp: drawMouseUp, handleDoubleClick } = useDrawing()
+  const { handleMouseDown: drawMouseDown, handleMouseMove: drawMouseMove, handleMouseUp: drawMouseUp, handleDoubleClick, editingText, setEditingText, finalizeText } = useDrawing()
   const { handleMouseDown: selectMouseDown, handleMouseMove: selectMouseMove, handleMouseUp: selectMouseUp, deleteSelected, duplicateSelected, bringForward, sendBackward } = useSelection()
   const { undo, redo, canUndo, canRedo } = useHistory()
-  const { connect, disconnect, joinRoom, leaveRoom, isConnected } = useSocket()
+  const { connect, disconnect, joinRoom, leaveRoom, isConnected, emitCursorMove } = useSocket()
   const selectedIds = useCanvasStore((state) => state.selectedIds)
+  const setViewport = useCanvasStore((state) => state.setViewport)
+  const viewport = useCanvasStore((state) => state.viewport)
   const currentTool = useToolStore((state) => state.currentTool)
+  const [isPanning, setIsPanning] = useState(false)
 
   // Unified mouse handlers based on current tool
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (editingText) {
+      finalizeText(editingText.text)
+      return
+    }
+
+    if (currentTool === 'pan') {
+      setIsPanning(true)
+      return
+    }
+    
     if (currentTool === 'selection') {
       selectMouseDown(e)
     } else {
@@ -33,15 +48,37 @@ export const RoomPage: React.FC = () => {
     }
   }
 
+  // Memoized throttled cursor emitter to limit network calls (Phase 12: Performance optimization)
+  const throttledEmitCursorMove = React.useMemo(() => throttle((x: number, y: number) => {
+    emitCursorMove(x, y)
+  }, 50), [emitCursorMove])
+
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (currentTool === 'pan') {
+      if (isPanning) {
+        setViewport({
+          x: viewport.x + e.movementX,
+          y: viewport.y + e.movementY
+        })
+      }
+      return
+    }
+
     if (currentTool === 'selection') {
       selectMouseMove(e)
     } else {
       drawMouseMove(e)
     }
+    const rect = e.currentTarget.getBoundingClientRect()
+    throttledEmitCursorMove(e.clientX - rect.left, e.clientY - rect.top)
   }
 
   const handleMouseUp = () => {
+    if (currentTool === 'pan') {
+      setIsPanning(false)
+      return
+    }
+
     if (currentTool === 'selection') {
       selectMouseUp()
     } else {
@@ -93,6 +130,20 @@ export const RoomPage: React.FC = () => {
     }
   }, [roomId, connect, disconnect, joinRoom, leaveRoom])
 
+  const handleZoom = (direction: 'in' | 'out') => {
+    const zoomFactor = direction === 'in' ? 1.25 : 0.8
+    const newZoom = Math.min(Math.max(viewport.zoom * zoomFactor, 0.1), 5)
+    
+    // Zoom towards center of screen
+    const centerX = window.innerWidth / 2
+    const centerY = window.innerHeight / 2
+    
+    const newX = centerX - (centerX - viewport.x) * (newZoom / viewport.zoom)
+    const newY = centerY - (centerY - viewport.y) * (newZoom / viewport.zoom)
+    
+    setViewport({ x: newX, y: newY, zoom: newZoom })
+  }
+
   const handleCreateRoom = (e: React.FormEvent) => {
     e.preventDefault()
     const id = nanoid(10)
@@ -143,8 +194,34 @@ export const RoomPage: React.FC = () => {
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           onDoubleClick={handleDoubleClick}
-          className="w-full h-full block bg-[#0f1015] cursor-default"
+          className={`w-full h-full block bg-bg-light dark:bg-[#0f1015] ${currentTool === 'pan' ? (isPanning ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-crosshair'}`}
         />
+
+        {/* Text Input Overlay */}
+        {editingText && (
+          <input
+            autoFocus
+            type="text"
+            className="absolute bg-white/10 dark:bg-black/10 border-none outline-none text-black dark:text-white p-1 m-0 focus:ring-2 focus:ring-purple-500 rounded"
+            style={{
+              left: `${editingText.x}px`,
+              top: `${editingText.y}px`,
+              transform: 'translateY(-50%)',
+              fontFamily: 'sans-serif',
+              fontSize: '14px',
+              minWidth: '100px'
+            }}
+            value={editingText.text}
+            onChange={(e) => setEditingText({ ...editingText, text: e.target.value })}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                finalizeText(editingText.text)
+              } else if (e.key === 'Escape') {
+                finalizeText('')
+              }
+            }}
+          />
+        )}
 
         {/* Drawing Tools */}
         <Toolbar />
@@ -152,7 +229,11 @@ export const RoomPage: React.FC = () => {
 
         {/* Selection Actions */}
         {selectedIds.length > 0 && (
-          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-2 flex items-center gap-2 z-50">
+          <motion.div 
+            initial={{ y: 50, opacity: 0, x: '-50%' }}
+            animate={{ y: 0, opacity: 1, x: '-50%' }}
+            className="fixed bottom-4 left-1/2 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-2 flex items-center gap-2 z-50"
+          >
             <button
               onClick={duplicateSelected}
               className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
@@ -182,11 +263,15 @@ export const RoomPage: React.FC = () => {
             >
               <Trash2 size={20} className="text-red-500" />
             </button>
-          </div>
+          </motion.div>
         )}
 
         {/* History Actions */}
-        <div className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-2 flex items-center gap-2 z-50">
+        <motion.div 
+          initial={{ y: 50, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-2 flex items-center gap-2 z-50"
+        >
           <button
             onClick={undo}
             disabled={!canUndo}
@@ -203,7 +288,32 @@ export const RoomPage: React.FC = () => {
           >
             <Redo size={20} className="text-gray-600 dark:text-gray-300" />
           </button>
-        </div>
+        </motion.div>
+
+        {/* Zoom Controls */}
+        <motion.div 
+          initial={{ y: 50, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="fixed bottom-4 left-4 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-2 flex items-center gap-2 z-50"
+        >
+          <button
+            onClick={() => handleZoom('out')}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            title="Zoom Out"
+          >
+            <ZoomOut size={20} className="text-gray-600 dark:text-gray-300" />
+          </button>
+          <span className="text-xs font-semibold text-gray-600 dark:text-gray-300 w-12 text-center">
+            {Math.round(viewport.zoom * 100)}%
+          </span>
+          <button
+            onClick={() => handleZoom('in')}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            title="Zoom In"
+          >
+            <ZoomIn size={20} className="text-gray-600 dark:text-gray-300" />
+          </button>
+        </motion.div>
       </div>
     )
   }

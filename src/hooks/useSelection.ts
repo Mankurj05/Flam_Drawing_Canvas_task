@@ -3,6 +3,7 @@ import type { CanvasObject, Point } from '@/types/canvas'
 import { useCanvasStore } from '@/store/canvasStore'
 import { useToolStore } from '@/store/toolStore'
 
+
 export const useSelection = () => {
   const [isDragging, setIsDragging] = useState(false)
   const [isResizing, setIsResizing] = useState(false)
@@ -19,9 +20,10 @@ export const useSelection = () => {
   const getCanvasCoordinates = useCallback((e: React.MouseEvent<HTMLCanvasElement>): Point => {
     const canvas = e.currentTarget
     const rect = canvas.getBoundingClientRect()
+    const viewport = useCanvasStore.getState().viewport
     return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
+      x: (e.clientX - rect.left - viewport.x) / viewport.zoom,
+      y: (e.clientY - rect.top - viewport.y) / viewport.zoom
     }
   }, [])
 
@@ -53,11 +55,25 @@ export const useSelection = () => {
 
   const getResizeHandle = useCallback((point: Point, obj: CanvasObject): string | null => {
     const handleSize = 10
+    const cx = obj.x + obj.width / 2
+    const cy = obj.y + obj.height / 2
+
+    const rotatePoint = (x: number, y: number) => {
+      const cos = Math.cos(obj.rotation)
+      const sin = Math.sin(obj.rotation)
+      const dx = x - cx
+      const dy = y - cy
+      return {
+        x: dx * cos - dy * sin + cx,
+        y: dx * sin + dy * cos + cy
+      }
+    }
+
     const handles = [
-      { name: 'tl', x: obj.x, y: obj.y },
-      { name: 'tr', x: obj.x + obj.width, y: obj.y },
-      { name: 'bl', x: obj.x, y: obj.y + obj.height },
-      { name: 'br', x: obj.x + obj.width, y: obj.y + obj.height },
+      { name: 'tl', ...rotatePoint(obj.x, obj.y) },
+      { name: 'tr', ...rotatePoint(obj.x + obj.width, obj.y) },
+      { name: 'bl', ...rotatePoint(obj.x, obj.y + obj.height) },
+      { name: 'br', ...rotatePoint(obj.x + obj.width, obj.y + obj.height) },
     ]
 
     for (const handle of handles) {
@@ -133,6 +149,11 @@ export const useSelection = () => {
       const dx = point.x - dragStart!.x
       const dy = point.y - dragStart!.y
       const obj = originalObject
+      
+      const cos = Math.cos(-obj.rotation)
+      const sin = Math.sin(-obj.rotation)
+      const localDx = dx * cos - dy * sin
+      const localDy = dx * sin + dy * cos
 
       let newX = obj.x
       let newY = obj.y
@@ -141,25 +162,48 @@ export const useSelection = () => {
 
       switch (resizeHandle) {
         case 'br':
-          newWidth = obj.width + dx
-          newHeight = obj.height + dy
+          newWidth = obj.width + localDx
+          newHeight = obj.height + localDy
           break
         case 'bl':
-          newX = obj.x + dx
-          newWidth = obj.width - dx
-          newHeight = obj.height + dy
+          newX = obj.x + localDx
+          newWidth = obj.width - localDx
+          newHeight = obj.height + localDy
           break
         case 'tr':
-          newY = obj.y + dy
-          newWidth = obj.width + dx
-          newHeight = obj.height - dy
+          newY = obj.y + localDy
+          newWidth = obj.width + localDx
+          newHeight = obj.height - localDy
           break
         case 'tl':
-          newX = obj.x + dx
-          newY = obj.y + dy
-          newWidth = obj.width - dx
-          newHeight = obj.height - dy
+          newX = obj.x + localDx
+          newY = obj.y + localDy
+          newWidth = obj.width - localDx
+          newHeight = obj.height - localDy
           break
+      }
+
+      // Maintain center position when resizing rotated objects
+      if (obj.rotation !== 0) {
+          const oldCx = obj.x + obj.width / 2
+          const oldCy = obj.y + obj.height / 2
+          const newCx = newX + newWidth / 2
+          const newCy = newY + newHeight / 2
+          
+          const shiftX = newCx - oldCx
+          const shiftY = newCy - oldCy
+          
+          const rCos = Math.cos(obj.rotation)
+          const rSin = Math.sin(obj.rotation)
+          
+          const globalShiftX = shiftX * rCos - shiftY * rSin
+          const globalShiftY = shiftX * rSin + shiftY * rCos
+          
+          const finalCx = oldCx + globalShiftX
+          const finalCy = oldCy + globalShiftY
+          
+          newX = finalCx - newWidth / 2
+          newY = finalCy - newHeight / 2
       }
 
       updateObject(obj.id, { x: newX, y: newY, width: newWidth, height: newHeight })

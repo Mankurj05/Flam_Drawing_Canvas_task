@@ -1,6 +1,7 @@
 import { Palette, Droplets, Minus } from 'lucide-react'
 import { useToolStore } from '@/store/toolStore'
 import { cn } from '@/utils/cn'
+import { motion } from 'framer-motion'
 
 const COLORS = [
   '#000000', '#ffffff', '#ef4444', '#f97316', '#eab308',
@@ -21,7 +22,14 @@ export const PropertyPanel = () => {
   const setOpacity = useToolStore((state) => state.setOpacity)
 
   return (
-    <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 flex items-center gap-6 z-50">
+    <motion.div 
+      initial={{ y: -50, opacity: 0, x: '-50%' }}
+      animate={{ y: 0, opacity: 1, x: '-50%' }}
+      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+      className="fixed top-4 left-1/2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-2xl shadow-2xl p-4 flex flex-wrap justify-center items-center gap-6 z-50 border border-gray-200 dark:border-gray-700 w-[90%] md:w-auto"
+      role="region"
+      aria-label="Property Panel"
+    >
       {/* Stroke Color */}
       <div className="flex flex-col items-center gap-2">
         <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
@@ -123,6 +131,6 @@ export const PropertyPanel = () => {
         />
         <span className="text-xs text-gray-500 dark:text-gray-400">{Math.round(opacity * 100)}%</span>
       </div>
-    </div>
+    </motion.div>
   )
 }

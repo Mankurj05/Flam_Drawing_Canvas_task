@@ -7,6 +7,8 @@ interface ToolState {
   fillColor: string
   strokeWidth: number
   opacity: number
+  fontSize: number
+  fontFamily: string
   
   // Actions
   setCurrentTool: (tool: ToolType) => void
@@ -14,15 +16,19 @@ interface ToolState {
   setFillColor: (color: string) => void
   setStrokeWidth: (width: number) => void
   setOpacity: (opacity: number) => void
+  setFontSize: (fontSize: number) => void
+  setFontFamily: (fontFamily: string) => void
   resetSettings: () => void
 }
 
 export const useToolStore = create<ToolState>((set) => ({
-  currentTool: 'selection',
-  strokeColor: '#000000',
+  currentTool: 'pencil',
+  strokeColor: '#aa3bff',
   fillColor: 'transparent',
-  strokeWidth: 2,
+  strokeWidth: 4,
   opacity: 1,
+  fontSize: 18,
+  fontFamily: 'Inter, system-ui, sans-serif',
 
   setCurrentTool: (tool) => set({ currentTool: tool }),
   
@@ -33,12 +39,18 @@ export const useToolStore = create<ToolState>((set) => ({
   setStrokeWidth: (width) => set({ strokeWidth: Math.max(1, Math.min(20, width)) }),
   
   setOpacity: (opacity) => set({ opacity: Math.max(0.1, Math.min(1, opacity)) }),
+
+  setFontSize: (fontSize) => set({ fontSize: Math.max(10, Math.min(72, fontSize)) }),
+
+  setFontFamily: (fontFamily) => set({ fontFamily }),
   
   resetSettings: () => set({
-    currentTool: 'selection',
-    strokeColor: '#000000',
+    currentTool: 'pencil',
+    strokeColor: '#aa3bff',
     fillColor: 'transparent',
-    strokeWidth: 2,
-    opacity: 1
+    strokeWidth: 4,
+    opacity: 1,
+    fontSize: 18,
+    fontFamily: 'Inter, system-ui, sans-serif',
   })
 }))

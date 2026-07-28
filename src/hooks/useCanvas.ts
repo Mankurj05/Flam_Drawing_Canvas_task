@@ -21,17 +21,26 @@ export const useCanvas = () => {
     // Setup Canvas dimension resize logic matching device pixel ratio
     const resizeCanvas = () => {
       const rect = canvas.getBoundingClientRect()
-      const dpr = window.devicePixelRatio || 1
-      canvas.width = rect.width * dpr
-      canvas.height = rect.height * dpr
+      if (rect.width === 0 || rect.height === 0) return // Skip if hidden or unmounted
       
-      const ctx = canvas.getContext('2d')
-      if (ctx) {
-        ctx.scale(dpr, dpr)
-      }
+      const dpr = window.devicePixelRatio || 1
+      const newWidth = Math.round(rect.width * dpr)
+      const newHeight = Math.round(rect.height * dpr)
 
-      if (engineRef.current) {
-        engineRef.current.render()
+      // Only resize if actually changed to prevent canvas clearing on identical resizes
+      if (canvas.width !== newWidth || canvas.height !== newHeight) {
+        canvas.width = newWidth
+        canvas.height = newHeight
+        
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.setTransform(1, 0, 0, 1, 0, 0) // Explicitly reset transform before scale just in case
+          ctx.scale(dpr, dpr)
+        }
+
+        if (engineRef.current) {
+          engineRef.current.render()
+        }
       }
     }
 
@@ -44,13 +53,18 @@ export const useCanvas = () => {
     )
     engineRef.current = engine
 
+    // Use ResizeObserver for robust tracking (handles flexbox changes, layout shifts, etc.)
+    const resizeObserver = new ResizeObserver(() => {
+      resizeCanvas()
+    })
+    resizeObserver.observe(canvas)
+    
+    // Initial resize
     resizeCanvas()
     engine.startRenderLoop()
 
-    window.addEventListener('resize', resizeCanvas)
-
     return () => {
-      window.removeEventListener('resize', resizeCanvas)
+      resizeObserver.disconnect()
       engine.stopRenderLoop()
       engineRef.current = null
     }

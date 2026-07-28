@@ -4,11 +4,14 @@ import type { CanvasObject, Point, ObjectType } from '@/types/canvas'
 import { useCanvasStore } from '@/store/canvasStore'
 import { useToolStore } from '@/store/toolStore'
 import { useSocketStore } from '@/store/socketStore'
+import { socketClient } from '@/socket/socketClient'
+import { useHistoryStore } from '@/store/historyStore'
 
 export const useDrawing = () => {
   const [isDrawing, setIsDrawing] = useState(false)
   const [currentObject, setCurrentObject] = useState<CanvasObject | null>(null)
   const [startPoint, setStartPoint] = useState<Point | null>(null)
+  const [editingText, setEditingText] = useState<{ id: string; text: string; x: number; y: number } | null>(null)
 
   const addObject = useCanvasStore((state) => state.addObject)
   const updateObject = useCanvasStore((state) => state.updateObject)
@@ -22,9 +25,10 @@ export const useDrawing = () => {
   const getCanvasCoordinates = useCallback((e: React.MouseEvent<HTMLCanvasElement>): Point => {
     const canvas = e.currentTarget
     const rect = canvas.getBoundingClientRect()
+    const viewport = useCanvasStore.getState().viewport
     return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
+      x: (e.clientX - rect.left - viewport.x) / viewport.zoom,
+      y: (e.clientY - rect.top - viewport.y) / viewport.zoom
     }
   }, [])
 
@@ -53,14 +57,32 @@ export const useDrawing = () => {
     if (currentTool === 'selection' || currentTool === 'pan' || currentTool === 'zoom') return
     
     const point = getCanvasCoordinates(e)
+    
+    // Text tool triggers on single click
+    if (currentTool === 'text') {
+      const newObj = createObject('text', point.x, point.y)
+      newObj.text = ''
+      newObj.width = 100
+      newObj.height = 20
+      addObject(newObj, false) // false = no history yet
+      setEditingText({ id: newObj.id, text: '', x: e.clientX, y: e.clientY })
+      return
+    }
+
     setStartPoint(point)
     setIsDrawing(true)
 
     const type: ObjectType = currentTool === 'eraser' ? 'pencil' : currentTool as ObjectType
     const newObj = createObject(type, point.x, point.y)
     
+    if (currentTool === 'eraser') {
+      newObj.metadata = { isEraser: true }
+      newObj.strokeWidth = Math.max(20, newObj.strokeWidth * 2) // Make eraser thicker
+    }
+    
     setCurrentObject(newObj)
-    addObject(newObj)
+    addObject(newObj, false)
+    socketClient.emitDrawStart(newObj)
   }, [currentTool, getCanvasCoordinates, createObject, addObject])
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -73,19 +95,20 @@ export const useDrawing = () => {
     if (currentObject.type === 'pencil') {
       // Free drawing - add points
       const updatedPoints = [...(currentObject.points || []), point]
-      updateObject(currentObject.id, {
+      const updates = {
         points: updatedPoints,
         width: Math.max(currentObject.width, dx),
         height: Math.max(currentObject.height, dy)
-      })
+      }
+      updateObject(currentObject.id, updates, false)
       setCurrentObject({ ...currentObject, points: updatedPoints })
+      socketClient.emitDrawUpdate(currentObject.id, updates)
     } else {
       // Shape drawing - update dimensions
-      updateObject(currentObject.id, {
-        width: dx,
-        height: dy
-      })
+      const updates = { width: dx, height: dy }
+      updateObject(currentObject.id, updates, false)
       setCurrentObject({ ...currentObject, width: dx, height: dy })
+      socketClient.emitDrawUpdate(currentObject.id, updates)
     }
   }, [isDrawing, currentObject, startPoint, getCanvasCoordinates, updateObject])
 
@@ -95,7 +118,14 @@ export const useDrawing = () => {
     // Finalize the object
     updateObject(currentObject.id, {
       updatedAt: Date.now()
-    })
+    }, false)
+    
+    const finalObject = useCanvasStore.getState().objects.find(o => o.id === currentObject.id)
+    if (finalObject) {
+      useHistoryStore.getState().pushAction({ type: 'add', object: finalObject })
+    }
+
+    socketClient.emitDrawEnd(currentObject.id)
 
     setIsDrawing(false)
     setCurrentObject(null)
@@ -103,23 +133,43 @@ export const useDrawing = () => {
   }, [isDrawing, currentObject, updateObject])
 
   const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (currentTool !== 'text') return
+    // Keep this for future if we want to double click to edit existing text
+  }, [])
 
-    const point = getCanvasCoordinates(e)
-    const text = prompt('Enter text:', '')
-    
-    if (text && text.trim()) {
-      const newObj = createObject('text', point.x, point.y)
-      newObj.text = text
-      newObj.width = text.length * 10 // Approximate width
-      newObj.height = 20
-      addObject(newObj)
+  const finalizeText = useCallback((text: string) => {
+    if (!editingText) return
+    if (text.trim()) {
+      const finalObjectTemp = useCanvasStore.getState().objects.find(o => o.id === editingText.id)
+      const strokeWidth = finalObjectTemp?.strokeWidth || 4
+      const fontSize = Math.max(14, strokeWidth * 4)
+      
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      let textWidth = Math.max(10, text.length * 10)
+      if (ctx) {
+        ctx.font = `${fontSize}px sans-serif`
+        textWidth = ctx.measureText(text).width
+      }
+      
+      updateObject(editingText.id, { text, width: textWidth, height: fontSize }, false)
+      const finalObject = useCanvasStore.getState().objects.find(o => o.id === editingText.id)
+      if (finalObject) {
+         socketClient.emitDrawStart(finalObject)
+         socketClient.emitDrawEnd(finalObject.id)
+         useHistoryStore.getState().pushAction({ type: 'add', object: finalObject })
+      }
+    } else {
+      useCanvasStore.getState().deleteObjects([editingText.id])
     }
-  }, [currentTool, getCanvasCoordinates, createObject, addObject])
+    setEditingText(null)
+  }, [editingText, updateObject])
 
   return {
     isDrawing,
     currentObject,
+    editingText,
+    setEditingText,
+    finalizeText,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
