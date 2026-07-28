@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid'
 import type { CanvasObject, Point, ObjectType } from '@/types/canvas'
 import { useCanvasStore } from '@/store/canvasStore'
 import { useToolStore } from '@/store/toolStore'
+import { useSocketStore } from '@/store/socketStore'
 
 export const useDrawing = () => {
   const [isDrawing, setIsDrawing] = useState(false)
@@ -16,6 +17,7 @@ export const useDrawing = () => {
   const fillColor = useToolStore((state) => state.fillColor)
   const strokeWidth = useToolStore((state) => state.strokeWidth)
   const opacity = useToolStore((state) => state.opacity)
+  const socketId = useSocketStore((state) => state.socketId)
 
   const getCanvasCoordinates = useCallback((e: React.MouseEvent<HTMLCanvasElement>): Point => {
     const canvas = e.currentTarget
@@ -29,7 +31,7 @@ export const useDrawing = () => {
   const createObject = useCallback((type: ObjectType, x: number, y: number): CanvasObject => {
     return {
       id: nanoid(),
-      userId: 'local-user', // Will be replaced with actual user ID
+      userId: socketId || 'local-user',
       type,
       x,
       y,
@@ -45,7 +47,7 @@ export const useDrawing = () => {
       createdAt: Date.now(),
       updatedAt: Date.now()
     }
-  }, [strokeColor, fillColor, strokeWidth, opacity])
+  }, [strokeColor, fillColor, strokeWidth, opacity, socketId])
 
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (currentTool === 'selection' || currentTool === 'pan' || currentTool === 'zoom') return

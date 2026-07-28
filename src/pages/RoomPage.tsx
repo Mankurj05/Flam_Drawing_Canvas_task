@@ -6,6 +6,7 @@ import { useCanvas } from '@/hooks/useCanvas'
 import { useDrawing } from '@/hooks/useDrawing'
 import { useSelection } from '@/hooks/useSelection'
 import { useHistory } from '@/hooks/useHistory'
+import { useSocket } from '@/hooks/useSocket'
 import { useCanvasStore } from '@/store/canvasStore'
 import { useToolStore } from '@/store/toolStore'
 import { Toolbar } from '@/components/toolbar/Toolbar'
@@ -19,6 +20,7 @@ export const RoomPage: React.FC = () => {
   const { handleMouseDown: drawMouseDown, handleMouseMove: drawMouseMove, handleMouseUp: drawMouseUp, handleDoubleClick } = useDrawing()
   const { handleMouseDown: selectMouseDown, handleMouseMove: selectMouseMove, handleMouseUp: selectMouseUp, deleteSelected, duplicateSelected, bringForward, sendBackward } = useSelection()
   const { undo, redo, canUndo, canRedo } = useHistory()
+  const { connect, disconnect, joinRoom, leaveRoom, isConnected } = useSocket()
   const selectedIds = useCanvasStore((state) => state.selectedIds)
   const currentTool = useToolStore((state) => state.currentTool)
 
@@ -78,6 +80,19 @@ export const RoomPage: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [deleteSelected, duplicateSelected, bringForward, sendBackward, undo, redo])
 
+  // Socket connection when entering a room
+  useEffect(() => {
+    if (roomId) {
+      connect()
+      joinRoom(roomId, 'User', '#aa3bff')
+
+      return () => {
+        leaveRoom(roomId)
+        disconnect()
+      }
+    }
+  }, [roomId, connect, disconnect, joinRoom, leaveRoom])
+
   const handleCreateRoom = (e: React.FormEvent) => {
     e.preventDefault()
     const id = nanoid(10)
@@ -108,8 +123,13 @@ export const RoomPage: React.FC = () => {
             <span className="font-bold text-white tracking-wide">Workspace: {roomId}</span>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-xs px-2.5 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 font-semibold flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span> Offline
+            <span className={`text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5 ${
+              isConnected 
+                ? 'bg-green-500/10 border border-green-500/20 text-green-400' 
+                : 'bg-red-500/10 border border-red-500/20 text-red-400'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></span>
+              {isConnected ? 'Connected' : 'Offline'}
             </span>
           </div>
         </header>
