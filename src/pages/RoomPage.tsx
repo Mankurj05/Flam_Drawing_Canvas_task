@@ -1,9 +1,12 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Plus, ArrowRight, ArrowLeft } from 'lucide-react'
+import { Plus, ArrowRight, ArrowLeft, Trash2, Copy, ArrowUp, ArrowDown } from 'lucide-react'
 import { nanoid } from 'nanoid'
 import { useCanvas } from '@/hooks/useCanvas'
 import { useDrawing } from '@/hooks/useDrawing'
+import { useSelection } from '@/hooks/useSelection'
+import { useCanvasStore } from '@/store/canvasStore'
+import { useToolStore } from '@/store/toolStore'
 import { Toolbar } from '@/components/toolbar/Toolbar'
 import { PropertyPanel } from '@/components/toolbar/PropertyPanel'
 
@@ -12,7 +15,56 @@ export const RoomPage: React.FC = () => {
   const navigate = useNavigate()
   const [roomInput, setRoomInput] = useState('')
   const { canvasRef, handleWheel } = useCanvas()
-  const { handleMouseDown, handleMouseMove, handleMouseUp, handleDoubleClick } = useDrawing()
+  const { handleMouseDown: drawMouseDown, handleMouseMove: drawMouseMove, handleMouseUp: drawMouseUp, handleDoubleClick } = useDrawing()
+  const { handleMouseDown: selectMouseDown, handleMouseMove: selectMouseMove, handleMouseUp: selectMouseUp, deleteSelected, duplicateSelected, bringForward, sendBackward } = useSelection()
+  const selectedIds = useCanvasStore((state) => state.selectedIds)
+  const currentTool = useToolStore((state) => state.currentTool)
+
+  // Unified mouse handlers based on current tool
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (currentTool === 'selection') {
+      selectMouseDown(e)
+    } else {
+      drawMouseDown(e)
+    }
+  }
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (currentTool === 'selection') {
+      selectMouseMove(e)
+    } else {
+      drawMouseMove(e)
+    }
+  }
+
+  const handleMouseUp = () => {
+    if (currentTool === 'selection') {
+      selectMouseUp()
+    } else {
+      drawMouseUp()
+    }
+  }
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        deleteSelected()
+      } else if (e.ctrlKey && e.key === 'd') {
+        e.preventDefault()
+        duplicateSelected()
+      } else if (e.ctrlKey && e.key === 'ArrowUp') {
+        e.preventDefault()
+        bringForward()
+      } else if (e.ctrlKey && e.key === 'ArrowDown') {
+        e.preventDefault()
+        sendBackward()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [deleteSelected, duplicateSelected, bringForward, sendBackward])
 
   const handleCreateRoom = (e: React.FormEvent) => {
     e.preventDefault()
@@ -65,6 +117,41 @@ export const RoomPage: React.FC = () => {
         {/* Drawing Tools */}
         <Toolbar />
         <PropertyPanel />
+
+        {/* Selection Actions */}
+        {selectedIds.length > 0 && (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-2 flex items-center gap-2 z-50">
+            <button
+              onClick={duplicateSelected}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              title="Duplicate (Ctrl+D)"
+            >
+              <Copy size={20} className="text-gray-600 dark:text-gray-300" />
+            </button>
+            <button
+              onClick={bringForward}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              title="Bring Forward (Ctrl+↑)"
+            >
+              <ArrowUp size={20} className="text-gray-600 dark:text-gray-300" />
+            </button>
+            <button
+              onClick={sendBackward}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              title="Send Backward (Ctrl+↓)"
+            >
+              <ArrowDown size={20} className="text-gray-600 dark:text-gray-300" />
+            </button>
+            <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
+            <button
+              onClick={deleteSelected}
+              className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors"
+              title="Delete"
+            >
+              <Trash2 size={20} className="text-red-500" />
+            </button>
+          </div>
+        )}
       </div>
     )
   }
